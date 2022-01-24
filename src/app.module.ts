@@ -4,9 +4,11 @@ import { ScheduleModule }  from '@nestjs/schedule';
 import { SequelizeModule } from '@nestjs/sequelize';
 
 import { TabuaDeMareModule } from './tabuaDeMare/tabuaDeMare.module';
+import { TidesModule } from './tides/tides.module';
 
 @Module({
   imports: [
+    TidesModule,
     TabuaDeMareModule,
     ScheduleModule.forRoot(),
     ConfigModule.forRoot(),
