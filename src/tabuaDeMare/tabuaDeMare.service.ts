@@ -1,4 +1,4 @@
-import { Injectable }  from '@nestjs/common';
+import { Injectable, Logger }  from '@nestjs/common';
 import { Cron }        from '@nestjs/schedule';
 import { InjectModel } from '@nestjs/sequelize';
 
@@ -14,14 +14,16 @@ import { Sun }            from 'src/models/sun.model';
 import { Tides }            from 'src/models/tides.model';
 
 @Injectable()
-export class TabuadeMareService {
-  private url = 'https://tabuademares.com/br/ceara/fortaleza';
-  
+export class TabuaDeMareService {
+  private          url = 'https://tabuademares.com/br/ceara/fortaleza';
+  private readonly logger = new Logger(TabuaDeMareService.name);
+
   constructor(
+    private sequelize: Sequelize,
     @InjectModel(Dates) private dates: typeof Dates,
     @InjectModel(FullRegistries) private fullRegistries: typeof FullRegistries,
     @InjectModel(Sun) private sun: typeof Sun,
-    @InjectModel(Tides) private tides: typeof Tides,
+    @InjectModel(Tides) private tides: typeof Tides
   ){}
   
   cleanReturnFromCherio(value: string[]){
@@ -99,45 +101,51 @@ export class TabuadeMareService {
     }
   }
 
-  @Cron('0 0 0 1 * *')
+  @Cron('40 * * * * *')
   async load(): Promise<any>{
     const tide: any = await this.execute();
     
     try{
-      const { id: fk_full_registry_id } = await this.fullRegistries.create({ source: 'Tabua de Maré' });
-
-      for(let i in tide){
-        await this.dates.create({
-          year:  tide[i].year,
-          month: tide[i].month,
-          day:   tide[i].day,
+      this.logger.log('Starting load tides on database');
+      await this.sequelize.transaction(async t => {
+        const transactionHost = { transaction: t };
+        const { id: fk_full_registry_id } = await this.fullRegistries.create({ source: 'Tabua de Maré' }, transactionHost);
+  
+        for(let i in tide){
+          await this.dates.create({
+            year:  tide[i].year,
+            month: tide[i].month,
+            day:   tide[i].day,
+            fk_full_registry_id
+          }, transactionHost);
+  
+          await this.sun.create({
+          sunrise: tide[i].sunrise,
+          sunset:  tide[i].sunset,
           fk_full_registry_id
-        });
+          }, transactionHost);
+  
+          await this.tides.create({
+          first_tide_hour: tide[i].tide[0],
+          first_tide:      tide[i].tide[1],
+  
+          second_tide_hour: tide[i].tide[2],
+          second_tide:      tide[i].tide[3],
+  
+          third_tide_hour: tide[i].tide[4],
+          third_tide:      tide[i].tide[5],
+  
+          forth_tide_hour: tide[i].tide[6] ? tide[i].tide[6] : null,
+          forth_tide:      tide[i].tide[7] ? tide[i].tide[7] : null,
+  
+          fk_full_registry_id
+          }, transactionHost);
+        }
+      });
 
-        await this.sun.create({
-        sunrise: tide[i].sunrise,
-        sunset:  tide[i].sunset,
-        fk_full_registry_id
-        });
-
-        await this.tides.create({
-        first_tide_hour: tide[i].tide[0],
-        first_tide:      tide[i].tide[1],
-
-        second_tide_hour: tide[i].tide[2],
-        second_tide:      tide[i].tide[3],
-
-        third_tide_hour: tide[i].tide[4],
-        third_tide:      tide[i].tide[5],
-
-        forth_tide_hour: tide[i].tide[6] ? tide[i].tide[6] : null,
-        forth_tide:      tide[i].tide[7] ? tide[i].tide[7] : null,
-
-        fk_full_registry_id
-        });
-      }
+      this.logger.log('Successful load tides on database');
     }catch(err){
-
+      this.logger.error('Failed on load tides', err.message);
     }
   }
 }
