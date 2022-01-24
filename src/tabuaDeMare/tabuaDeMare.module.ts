@@ -1,6 +1,4 @@
 import { Module }          from '@nestjs/common';
-import { ConfigModule }    from '@nestjs/config';
-import { ScheduleModule }  from '@nestjs/schedule';
 import { SequelizeModule } from '@nestjs/sequelize';
 
 import { TabuaDeMareService } from './tabuaDeMare.service';
