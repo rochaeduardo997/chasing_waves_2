@@ -101,7 +101,7 @@ export class TabuaDeMareService {
     }
   }
 
-  @Cron('40 * * * * *')
+  @Cron('0 0 0 1 * *')
   async load(): Promise<any>{
     const tide: any = await this.execute();
     
